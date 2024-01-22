@@ -19,4 +19,4 @@ related_publications: false
     </div>
 </div>
 
-Longboard was hit by a car and broke. Fixed it with a giant chunk of aluminum and some carbon fiber. 
+Longboard was hit by a car and broke. Fixed it with a giant chunk of aluminum and some carbon fiber.

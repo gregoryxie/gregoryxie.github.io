@@ -25,4 +25,4 @@ related_publications: false
     </div>
 </div>
 
-3D printed ring to commemorate the semesters of online learning. 
+3D printed ring to commemorate the semesters of online learning.

@@ -4,7 +4,7 @@
 
 title: Gregory Xie # the website title (if blank, full name will be used instead)
 first_name: Gregory
-middle_name: 
+middle_name:
 last_name: Xie
 email: you@example.com
 description: > # the ">" symbol means to ignore newlines until "footer_text:"
@@ -395,7 +395,6 @@ mdb:
 medium_zoom:
   version: "1.0.8"
   integrity: "sha256-7PhEpEWEW0XXQ0k6kQrPKwuoIomz8R8IYyuU1Qew4P8="
-
 # -----------------------------------------------------------------------------
 # Get external JSON data
 # -----------------------------------------------------------------------------

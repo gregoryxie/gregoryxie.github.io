@@ -34,4 +34,4 @@ related_publications: false
     </div>
 </div>
 
-2-dof swing for East Campus REX. Operators pushed the swing and riders spun themselves around using the wheel. 
+2-dof swing for East Campus REX. Operators pushed the swing and riders spun themselves around using the wheel.

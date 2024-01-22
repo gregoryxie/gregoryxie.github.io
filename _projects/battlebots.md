@@ -16,4 +16,4 @@ related_publications: false
     </div>
 </div>
 
-Part of a team that made a 250lb combat robot for the TV show Battlebots (2019). Made a 12lb mini-bot to throw into the ring for fun. 
+Part of a team that made a 250lb combat robot for the TV show Battlebots (2019). Made a 12lb mini-bot to throw into the ring for fun.

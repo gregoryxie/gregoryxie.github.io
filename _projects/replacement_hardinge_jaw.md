@@ -19,4 +19,4 @@ related_publications: false
     </div>
 </div>
 
-Broke a jaw on the MITERS Hardinge 3-jaw chuck. Made a replacement. 
+Broke a jaw on the MITERS Hardinge 3-jaw chuck. Made a replacement.

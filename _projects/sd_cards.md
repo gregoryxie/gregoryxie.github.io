@@ -16,4 +16,4 @@ related_publications: false
     </div>
 </div>
 
-Personalized holiday cards courtesy of Stable Diffusion and Walmart Photo. 
+Personalized holiday cards courtesy of Stable Diffusion and Walmart Photo.

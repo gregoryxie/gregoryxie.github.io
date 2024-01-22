@@ -46,4 +46,4 @@ related_publications: false
     </div>
 </div>
 
-3-dof seesaw for East Campus REX. Roll and pitch excited by bumps on a track, yaw driven by a 300kg gravity battery. 
+3-dof seesaw for East Campus REX. Roll and pitch excited by bumps on a track, yaw driven by a 300kg gravity battery.

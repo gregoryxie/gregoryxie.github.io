@@ -15,4 +15,4 @@ related_publications: false
 
 <iframe width="560" height="315" src="https://www.youtube.com/embed/r_UrsXbXPSQ?si=EwI8Y6tVSOqRYDVE" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
 
-Slide whistle that automatically plays MIDI files. Essentially a moteus dev kit attached to a two-link arm with the end of the second link constrained by a linear rail. 
+Slide whistle that automatically plays MIDI files. Essentially a moteus dev kit attached to a two-link arm with the end of the second link constrained by a linear rail.

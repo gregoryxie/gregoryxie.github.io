@@ -27,4 +27,4 @@ related_publications: false
 
 <iframe width="560" height="315" src="https://www.youtube.com/embed/Hc7ZZhGV2LI?si=3SpHcmnqTovhyAJe" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
 
-2-DOF reaction wheel stick. Assumed axes had no coupling and designed a LQR controller. Key to stability was an integrator on flywheel velocity to drive it to zero at steady state. 
+2-DOF reaction wheel stick. Assumed axes had no coupling and designed a LQR controller. Key to stability was an integrator on flywheel velocity to drive it to zero at steady state.
