@@ -28,8 +28,6 @@ on:
       - "!docs/FAQ.md"
       - "!docs/INSTALL.md"
       - "!README.md"
-      - "!AGENTS.md"
-      - "!CLAUDE.md"
   pull_request:
     branches:
       - master
@@ -57,8 +55,6 @@ on:
       - "!docs/FAQ.md"
       - "!docs/INSTALL.md"
       - "!README.md"
-      - "!AGENTS.md"
-      - "!CLAUDE.md"
   workflow_dispatch:
 
 permissions:
