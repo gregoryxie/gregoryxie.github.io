@@ -41,9 +41,9 @@ I completed my Masters at MIT with Daniela Rus. Before that, I completed undergr
 
 <div class="row mt-3">
     <div class="col-sm mt-3 mt-md-0">
-        {% include video.liquid path="https://www.youtube.com/embed/eIa9fKkxXAo?si=5J-vbJtl_g-8TKet" class="img-fluid rounded z-depth-1" %}
+        <figure><iframe src="https://www.youtube.com/embed/eIa9fKkxXAo?si=5J-vbJtl_g-8TKet&mute=1" class="rounded z-depth-1" style="width: 100%; aspect-ratio: 16 / 9;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></figure>
     </div>
     <div class="col-sm mt-3 mt-md-0">
-        {% include video.liquid path="https://www.youtube.com/embed/tAPvN-tQpX0?si=KN0uRs9D3ClANkUx" class="img-fluid rounded z-depth-1" %}
+        <figure><iframe src="https://www.youtube.com/embed/tAPvN-tQpX0?si=KN0uRs9D3ClANkUx&mute=1" class="rounded z-depth-1" style="width: 100%; aspect-ratio: 16 / 9;" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></figure>
     </div>
 </div>
