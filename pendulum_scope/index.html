@@ -1,0 +1,1254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Pendulum scope</title>
+<style>
+/* Layout: a toolbar, a row of readouts, then stacked strip charts that
+   share one time axis, like the channels of an oscilloscope. */
+:root {
+  --bg: #f4f4f1;
+  --surface: #fcfcfb;
+  --line: #dddcd6;
+  --grid: #e9e8e3;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --text-3: #86857f;
+  --accent: #2a78d6;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --mode-waiting: #b9b8b0;
+  --mode-swingup: #eda100;
+  --mode-balancing: #1baf7a;
+  --mode-return: #4a3aa7;
+  --mode-settling: #2a78d6;
+  --good: #0ca30c;
+  --critical: #d03b3b;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121211;
+    --surface: #1a1a19;
+    --line: #34342f;
+    --grid: #2a2a27;
+    --text: #ffffff;
+    --text-2: #c3c2b7;
+    --text-3: #8b8a82;
+    --accent: #3987e5;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --mode-waiting: #5d5c56;
+    --mode-swingup: #c98500;
+    --mode-balancing: #199e70;
+    --mode-return: #9085e9;
+    --mode-settling: #3987e5;
+    --good: #0ca30c;
+    --critical: #e66767;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.4 var(--sans);
+  padding: 12px 16px 24px;
+}
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-bottom: 10px;
+}
+h1 { font-size: 16px; font-weight: 600; margin: 0 6px 0 0; }
+button, select, input {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 10px;
+}
+button { cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--text-3); }
+button:disabled { color: var(--text-3); cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:focus-visible, select:focus-visible, input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+label { color: var(--text-2); display: inline-flex; align-items: center; gap: 6px; }
+input[type="number"] { width: 84px; font-family: var(--mono); }
+.spacer { flex: 1 1 auto; }
+#status { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); }
+#status .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-3); }
+#status.live .dot { background: var(--good); }
+#status.error .dot { background: var(--critical); }
+#message { color: var(--critical); margin: 0 0 8px; min-height: 1.4em; }
+#readouts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 22px;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.readout { display: flex; flex-direction: column; min-width: 86px; }
+.readout .name { color: var(--text-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.readout .value { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 14px; }
+.readout .value.bad { color: var(--critical); }
+#panels { display: flex; flex-direction: column; gap: 6px; }
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px 4px;
+}
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 16px;
+  padding: 0 2px 2px;
+}
+.panel-title { font-weight: 600; }
+.panel-title .unit { color: var(--text-3); font-weight: 400; }
+.legend { display: flex; flex-wrap: wrap; gap: 2px 16px; color: var(--text-2); }
+.legend .item { display: inline-flex; align-items: center; gap: 6px; }
+.legend .swatch { width: 14px; height: 3px; border-radius: 2px; }
+.legend .block { width: 10px; height: 10px; border-radius: 2px; }
+.legend .num { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--text); min-width: 7ch; text-align: right; }
+canvas { display: block; width: 100%; }
+.panel canvas { height: 132px; }
+.panel.strip canvas { height: 26px; }
+#axis { height: 22px; margin-top: 2px; }
+footer { color: var(--text-3); margin-top: 10px; max-width: 80ch; }
+@media (max-width: 640px) {
+  .panel canvas { height: 110px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Pendulum scope</h1>
+  <button id="connect" class="primary">Connect</button>
+  <button id="demo">Demo data</button>
+  <button id="pause" disabled>Pause</button>
+  <label>Window
+    <select id="window">
+      <option value="2">2 s</option>
+      <option value="5">5 s</option>
+      <option value="10" selected>10 s</option>
+      <option value="30">30 s</option>
+      <option value="60">60 s</option>
+    </select>
+  </label>
+  <label title="Queries kept in flight at once. More than 1 can exceed one sample per USB frame.">In flight
+    <select id="depth">
+      <option value="1" selected>1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+    </select>
+  </label>
+  <label title="Pole encoder reading, in turns, when the pole hangs straight down.">Angle offset
+    <input id="offset" type="number" step="0.0005" min="0" max="1">
+  </label>
+  <button id="clear">Clear</button>
+  <button id="save" disabled>Save CSV</button>
+  <span class="spacer"></span>
+  <span id="status"><span class="dot"></span><span id="status-text">Not connected</span></span>
+</header>
+<p id="message" role="status"></p>
+
+<section id="readouts" aria-label="Live readouts"></section>
+<section id="panels" aria-label="Traces"></section>
+<canvas id="axis" aria-hidden="true"></canvas>
+
+<footer>
+  This page only reads from the controller: it repeats one query frame and never
+  sends a command. While it is connected, other programs cannot use the adapter.
+</footer>
+
+<script>
+// Encode and decode moteus register frames as fdcanusb text lines,
+// driven entirely by the description in protocol.json (see
+// gen_protocol.py).  No dependencies; runs in the page and under node.
+
+(function (root) {
+  'use strict';
+
+  const TYPE_SIZE = { i8: 1, i16: 2, i32: 4, f32: 4 };
+  const TYPE_CODE = { i8: 0, i16: 1, i32: 2, f32: 3 };
+  const TYPE_BY_CODE = ['i8', 'i16', 'i32', 'f32'];
+  const INT_MIN = { i8: -128, i16: -32768, i32: -2147483648 };
+
+  const REPLY_BASE = 0x20;
+  const WRITE_ERROR = 0x30;
+  const READ_ERROR = 0x31;
+  const NOP = 0x50;
+
+  function hexToBytes(hex) {
+    const out = new Uint8Array(hex.length >> 1);
+    for (let i = 0; i < out.length; i++) {
+      out[i] = parseInt(hex.substr(2 * i, 2), 16);
+    }
+    return out;
+  }
+
+  function bytesToHex(bytes) {
+    let out = '';
+    for (let i = 0; i < bytes.length; i++) {
+      out += (bytes[i] < 16 ? '0' : '') + bytes[i].toString(16).toUpperCase();
+    }
+    return out;
+  }
+
+  function makeCodec(spec) {
+    const byId = new Map();
+    for (const reg of spec.registers) { byId.set(reg.id, reg); }
+    const replyId = spec.query.reply_id;
+
+    function readValue(view, offset, type) {
+      switch (type) {
+        case 'i8': return view.getInt8(offset);
+        case 'i16': return view.getInt16(offset, true);
+        case 'i32': return view.getInt32(offset, true);
+        default: return view.getFloat32(offset, true);
+      }
+    }
+
+    // Decode the data bytes of a reply frame into {key: value}.
+    // Registers the controller could not read are listed in errors.
+    function decodeData(bytes) {
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.length);
+      const values = {};
+      const errors = [];
+      let i = 0;
+
+      function varuint() {
+        let result = 0;
+        let shift = 0;
+        for (let n = 0; n < 5 && i < bytes.length; n++) {
+          const b = bytes[i++];
+          result += (b & 0x7f) * Math.pow(2, shift);
+          if (!(b & 0x80)) { break; }
+          shift += 7;
+        }
+        return result;
+      }
+
+      while (i < bytes.length) {
+        const cmd = bytes[i++];
+        if ((cmd & 0xf0) === REPLY_BASE) {
+          const type = TYPE_BY_CODE[(cmd >> 2) & 0x3];
+          let count = cmd & 0x3;
+          if (count === 0) { count = varuint(); }
+          if (count === 0) { continue; }
+          const start = varuint();
+          const size = TYPE_SIZE[type];
+          for (let k = 0; k < count; k++) {
+            if (i + size > bytes.length) { return { values, errors }; }
+            const raw = readValue(view, i, type);
+            i += size;
+            const reg = byId.get(start + k);
+            if (!reg) { continue; }
+            if (type !== 'f32' && reg.nan_marker && raw === INT_MIN[type]) {
+              values[reg.key] = NaN;
+            } else {
+              values[reg.key] = raw * (type === 'f32' ? 1 : reg.scale);
+            }
+          }
+        } else if (cmd === READ_ERROR || cmd === WRITE_ERROR) {
+          const register = varuint();
+          const code = varuint();
+          errors.push({ register, code });
+        } else if (cmd === NOP) {
+          continue;
+        } else {
+          // Something we do not understand; stop rather than guess.
+          break;
+        }
+      }
+      return { values, errors };
+    }
+
+    // Decode one line from the adapter.  Returns null unless it is a
+    // frame from our controller.
+    function decodeLine(line) {
+      if (line.charCodeAt(0) !== 114 /* r */ || !line.startsWith('rcv ')) {
+        return null;
+      }
+      const fields = line.trim().split(' ');
+      if (fields.length < 3) { return null; }
+      if (parseInt(fields[1], 16) !== replyId) { return null; }
+      return decodeData(hexToBytes(fields[2]));
+    }
+
+    // The reverse of decodeData, laid out the way the controller
+    // answers the query.  Used for the demo and for tests.
+    function encodeReply(values) {
+      const query = hexToBytes(spec.query.data_hex);
+      const out = [];
+      let i = 0;
+      while (i < query.length) {
+        const cmd = query[i++];
+        if (cmd === NOP) { continue; }
+        const type = TYPE_BY_CODE[(cmd >> 2) & 0x3];
+        let count = cmd & 0x3;
+        out.push(REPLY_BASE | (cmd & 0x0f));
+        if (count === 0) { count = query[i++]; out.push(count); }
+        const start = query[i++];
+        out.push(start);
+        const size = TYPE_SIZE[type];
+        for (let k = 0; k < count; k++) {
+          const reg = byId.get(start + k);
+          const value = reg ? values[reg.key] : 0;
+          const buffer = new ArrayBuffer(4);
+          const view = new DataView(buffer);
+          if (type === 'f32') {
+            view.setFloat32(0, value, true);
+          } else {
+            const raw = Number.isNaN(value) ?
+                INT_MIN[type] : Math.round(value / reg.scale);
+            if (type === 'i8') { view.setInt8(0, raw); }
+            else if (type === 'i16') { view.setInt16(0, raw, true); }
+            else { view.setInt32(0, raw, true); }
+          }
+          for (let b = 0; b < size; b++) { out.push(view.getUint8(b)); }
+        }
+      }
+      const sizes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32, 48, 64];
+      const padded = sizes.find((s) => s >= out.length);
+      while (out.length < padded) { out.push(NOP); }
+      return 'rcv ' + replyId.toString(16) + ' ' +
+          bytesToHex(Uint8Array.from(out)) + ' B F';
+    }
+
+    return {
+      sendLine: spec.query.send_line,
+      decodeLine,
+      decodeData,
+      encodeReply,
+    };
+  }
+
+  const api = { makeCodec, hexToBytes, bytesToHex, TYPE_CODE };
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = api;
+  } else {
+    root.PendulumCodec = api;
+  }
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
+<script>
+'use strict';
+
+const SPEC = {"comment":"Generated by scope/gen_protocol.py; do not edit.","controller_id":1,"adapter":{"usb_ids":[{"vendor":4617,"product":8995},{"vendor":1155,"product":22336}],"baud_rate":921600},"query":{"arbitration_id":32769,"reply_id":256,"data_hex":"11001C0401110F1C044C1E52176E","send_line":"can send 8001 11001C0401110F1C044C1E52176E5050 BF\n","reply_size":62},"registers":[{"id":0,"key":"mode","label":"Servo mode","unit":"","type":"i8","scale":1,"nan_marker":false},{"id":1,"key":"position","label":"Motor position","unit":"turns","type":"f32","scale":1.0,"nan_marker":false},{"id":2,"key":"velocity","label":"Motor velocity","unit":"rev/s","type":"f32","scale":1.0,"nan_marker":false},{"id":3,"key":"torque","label":"Measured torque","unit":"Nm","type":"f32","scale":1.0,"nan_marker":false},{"id":4,"key":"q_current","label":"Q axis current","unit":"A","type":"f32","scale":1.0,"nan_marker":false},{"id":15,"key":"fault","label":"Fault","unit":"","type":"i8","scale":1,"nan_marker":false},{"id":76,"key":"balance_mode","label":"Controller mode","unit":"","type":"f32","scale":1.0,"nan_marker":false},{"id":77,"key":"balance_lean","label":"Commanded pole lean","unit":"turns","type":"f32","scale":1.0,"nan_marker":false},{"id":78,"key":"balance_torque","label":"Torque command","unit":"Nm","type":"f32","scale":1.0,"nan_marker":false},{"id":79,"key":"balance_integral","label":"Arm integral lean","unit":"turns","type":"f32","scale":1.0,"nan_marker":false},{"id":82,"key":"pole_position","label":"Pole encoder angle","unit":"turns","type":"f32","scale":1.0,"nan_marker":false},{"id":83,"key":"pole_velocity","label":"Pole velocity","unit":"rev/s","type":"f32","scale":1.0,"nan_marker":false},{"id":110,"key":"loop_time","label":"Worst loop time in the last ms","unit":"periods","type":"i16","scale":0.0001,"nan_marker":true},{"id":111,"key":"late_cycles","label":"Late control cycles","unit":"","type":"i16","scale":1,"nan_marker":true},{"id":112,"key":"ms_counter","label":"Millisecond counter","unit":"ms","type":"i16","scale":1,"nan_marker":false}],"enums":{"servo_mode":{"0":"stopped","1":"fault","2":"enabling","3":"calibrating","4":"calib_complete","5":"pwm","6":"voltage","7":"voltage_foc","8":"voltage_dq","9":"current","10":"position","11":"pos_timeout","12":"zero_vel","13":"within","14":"meas_ind","15":"brake","16":"builtin_control"},"fault":{"0":"Success","1":"DmaStreamTransferError","2":"DmaStreamFifoError","3":"UartOverrunError","4":"UartFramingError","5":"UartNoiseError","6":"UartBufferOverrunError","7":"UartParityError","32":"CalibrationFault","33":"MotorDriverFault","34":"OverVoltage","35":"EncoderFault","36":"MotorNotConfigured","37":"PwmCycleOverrun","38":"OverTemperature","39":"StartOutsideLimit","40":"UnderVoltage","41":"ConfigChanged","42":"ThetaInvalid","43":"PositionInvalid","44":"DriverEnableFault","45":"StopPositionDeprecated","46":"TimingViolation","47":"BemfFeedforwardNoAccelLimit","48":"InvalidLimits","49":"PositionControlError","50":"VelocityControlError","96":"LimitMaxVelocity","97":"LimitMaxPower","98":"LimitMaxVoltage","99":"LimitMaxCurrent","100":"LimitFetTemperature","101":"LimitMotorTemperature","102":"LimitMaxTorque","103":"LimitPositionBounds","104":"LimitFluxBraking","105":"LimitFieldWeakening"},"balance_mode":{"0":"swing-up","1":"balancing","2":"return","3":"waiting","4":"settling"}},"defaults":{"angle_offset":0.8755},"test_vectors":[{"line":"rcv 100 2100102C040119049EBF00006040F085493C000040BF210F002C044C0000803F6F1283BB5F294B3B27A0093B2E522E90C03E000080BE276E841E000039305050 B F","values":{"mode":16,"position":-1.2345000505447388,"velocity":3.5,"torque":0.012299999594688416,"q_current":-0.75,"fault":0,"balance_mode":1.0,"balance_lean":-0.004000000189989805,"balance_torque":0.003100000089034438,"balance_integral":0.002099999925121665,"pole_position":0.37610000371932983,"pole_velocity":-0.25,"loop_time":0.7812,"late_cycles":0,"ms_counter":12345}},{"line":"rcv 100 2100002C0401000098400000E1C2EC51B8BD9A997940210F252C044C000040400000000000000000000000002E52C520603F00000000276EAA37FF7F01805050 B F","values":{"mode":0,"position":4.75,"velocity":-112.5,"torque":-0.09000000357627869,"q_current":3.9000000953674316,"fault":37,"balance_mode":3.0,"balance_lean":0.0,"balance_torque":0.0,"balance_integral":0.0,"pole_position":0.8755000233650208,"pole_velocity":0.0,"loop_time":1.425,"late_cycles":32767,"ms_counter":-32767}},{"line":"rcv 100 2100012C04010000C07F000000000000000000000000210F212C044C00000000000000000AD723BC8D7A08BC2E5217B7D13800008041276E0080050000805050 B F","values":{"mode":1,"position":null,"velocity":0.0,"torque":0.0,"q_current":0.0,"fault":33,"balance_mode":0.0,"balance_lean":0.0,"balance_torque":-0.009999999776482582,"balance_integral":-0.008329999633133411,"pole_position":9.999999747378752e-05,"pole_velocity":16.0,"loop_time":null,"late_cycles":5,"ms_counter":-32768}}]};
+const codec = PendulumCodec.makeCodec(SPEC);
+
+// ---------------------------------------------------------------- data
+
+// Samples are kept in a rolling buffer: once it is full, each new
+// sample replaces the oldest.  Every sample is written twice,
+// CAPACITY apart, into arrays twice that long.  The samples held are
+// then always one unbroken run, which syncStore() hands out as plain
+// arrays with the oldest sample at index 0.
+const CAPACITY = 400000;
+const CHANNELS = [
+  'position', 'velocity', 'torque_mNm', 'q_current',
+  'pole_raw', 'pole_deg', 'pole_velocity',
+  'balance_mode', 'lean_deg', 'torque_cmd_mNm', 'integral_deg',
+  'lean_plot_deg', 'integral_plot_deg',
+  'mode', 'fault', 'loop_time', 'late_cycles',
+];
+const backing = {
+  t: new Float64Array(2 * CAPACITY),      // controller time, seconds
+  host: new Float64Array(2 * CAPACITY),   // host arrival time, ms
+};
+for (const name of CHANNELS) {
+  backing[name] = new Float32Array(2 * CAPACITY);
+}
+const store = { n: 0 };
+let writeAt = 0;   // where the next sample goes, below CAPACITY
+
+// Bring the arrays in `store` up to date with the samples held.  Call
+// this before reading them.
+function syncStore() {
+  const start = (writeAt - store.n + CAPACITY) % CAPACITY;
+  for (const name in backing) {
+    store[name] = backing[name].subarray(start, start + store.n);
+  }
+}
+syncStore();
+
+const BALANCING_MODE = 1;
+let angleOffset = SPEC.defaults.angle_offset;
+let lastMs = null;
+let deviceSeconds = 0;
+// The late cycle count is 15 bits and wraps; this is the running total.
+let lastLate = null;
+let lateTotal = 0;
+let loopWorst = 0;
+
+// The pole angle is unwrapped, so that it carries on past half a turn
+// instead of jumping to the other side.  Zero is upright; hanging down
+// is 180 degrees either way, and every further full turn adds 360.
+// `pole` holds where the unwrapping has got to.
+const pole = { last: null, turns: 0 };
+
+function poleDegrees(raw) {
+  let x = raw - angleOffset;
+  x -= Math.floor(x);
+  if (pole.last === null) {
+    pole.turns = x;
+  } else {
+    // The shorter way round from the last reading.
+    let step = x - pole.last;
+    step -= Math.round(step);
+    pole.turns += step;
+  }
+  pole.last = x;
+  return (pole.turns - 0.5) * 360;
+}
+
+// The upright position nearest to an unwrapped pole angle, which is
+// the one the controller balances about.
+function nearestUpright(degrees) {
+  return Math.round(degrees / 360) * 360;
+}
+
+function resetTime() {
+  lastMs = null;
+  lastLate = null;
+}
+
+function clearData() {
+  pole.last = null;
+  store.n = 0;
+  writeAt = 0;
+  syncStore();
+  deviceSeconds = 0;
+  lateTotal = 0;
+  loopWorst = 0;
+  resetTime();
+}
+
+function addSample(v, hostMs) {
+  // The controller's millisecond counter gives the true sample time;
+  // host arrival times are bunched by USB.  It is 16 bits and wraps.
+  const ms = v.ms_counter & 0xffff;
+  if (lastMs !== null) {
+    deviceSeconds += ((ms - lastMs) & 0xffff) / 1000;
+  }
+  lastMs = ms;
+
+  if (lastLate !== null) { lateTotal += (v.late_cycles - lastLate) & 0x7fff; }
+  lastLate = v.late_cycles;
+  if (v.loop_time > loopWorst) { loopWorst = v.loop_time; }
+
+  const row = {
+    position: v.position,
+    velocity: v.velocity,
+    torque_mNm: v.torque * 1000,
+    q_current: v.q_current,
+    pole_raw: v.pole_position,
+    pole_deg: poleDegrees(v.pole_position),
+    pole_velocity: v.pole_velocity,
+    balance_mode: v.balance_mode,
+    lean_deg: v.balance_lean * 360,
+    torque_cmd_mNm: v.balance_torque * 1000,
+    integral_deg: v.balance_integral * 360,
+    mode: v.mode,
+    fault: v.fault,
+    loop_time: v.loop_time * 100,
+    late_cycles: lateTotal,
+  };
+  // The lean values are measured from upright.  To sit beside the
+  // unwrapped pole angle on the plot they go on top of whichever
+  // upright that is, and they mean nothing unless it is balancing.
+  const upright = v.balance_mode === BALANCING_MODE ?
+      nearestUpright(row.pole_deg) : NaN;
+  row.lean_plot_deg = upright + row.lean_deg;
+  row.integral_plot_deg = upright + row.integral_deg;
+  const i = writeAt;
+  backing.t[i] = backing.t[i + CAPACITY] = deviceSeconds;
+  backing.host[i] = backing.host[i + CAPACITY] = hostMs;
+  for (const name of CHANNELS) {
+    const data = backing[name];
+    data[i] = data[i + CAPACITY] = row[name];
+  }
+  writeAt = (writeAt + 1) % CAPACITY;
+  if (store.n < CAPACITY) { store.n++; }
+}
+
+// After the angle offset changes: work through the samples held,
+// oldest first, unwrapping again.
+function recomputePole() {
+  pole.last = null;
+  const start = (writeAt - store.n + CAPACITY) % CAPACITY;
+  const put = (name, i, value) => {
+    backing[name][i] = backing[name][i + CAPACITY] = value;
+  };
+  for (let k = 0; k < store.n; k++) {
+    const i = (start + k) % CAPACITY;
+    const degrees = poleDegrees(backing.pole_raw[i]);
+    const upright = backing.balance_mode[i] === BALANCING_MODE ?
+        nearestUpright(degrees) : NaN;
+    put('pole_deg', i, degrees);
+    put('lean_plot_deg', i, upright + backing.lean_deg[i]);
+    put('integral_plot_deg', i, upright + backing.integral_deg[i]);
+  }
+}
+
+// First index with t >= value.
+function lowerBound(value) {
+  let lo = 0;
+  let hi = store.n;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (store.t[mid] < value) { lo = mid + 1; } else { hi = mid; }
+  }
+  return lo;
+}
+
+// -------------------------------------------------------------- panels
+
+const BALANCING = 1;
+const MODE_NAMES = SPEC.enums.balance_mode;
+const MODE_VARS = {
+  0: '--mode-swingup', 1: '--mode-balancing', 2: '--mode-return',
+  3: '--mode-waiting', 4: '--mode-settling',
+};
+
+const PANELS = [
+  // The lean series are drawn on top of the upright the pole is at,
+  // and read out as the lean itself.
+  { title: 'Pole angle, unwrapped; upright is 0, 360, ...', unit: 'deg',
+    series: [
+      { key: 'pole_deg', label: 'measured', digits: 3 },
+      { key: 'lean_plot_deg', readKey: 'lean_deg',
+        label: 'commanded lean', digits: 3 },
+      { key: 'integral_plot_deg', readKey: 'integral_deg',
+        label: 'arm integral', digits: 3 },
+    ] },
+  { title: 'Motor position', unit: 'turns',
+    series: [{ key: 'position', label: 'position', digits: 3 }] },
+  { title: 'Motor velocity', unit: 'rev/s',
+    series: [{ key: 'velocity', label: 'velocity', digits: 2 }] },
+  { title: 'Pole velocity', unit: 'rev/s',
+    series: [{ key: 'pole_velocity', label: 'velocity', digits: 3 }] },
+  { title: 'Torque', unit: 'mNm',
+    series: [
+      { key: 'torque_cmd_mNm', label: 'controller command', digits: 2 },
+      { key: 'torque_mNm', label: 'measured', digits: 2 },
+    ] },
+  { title: 'Q axis current', unit: 'A',
+    series: [{ key: 'q_current', label: 'current', digits: 3 }] },
+  { title: 'Control loop time, worst in each millisecond', unit: '% of period',
+    series: [{ key: 'loop_time', label: 'loop time', digits: 1 }] },
+];
+
+const panelsEl = document.getElementById('panels');
+const css = (name) =>
+    getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) { node.className = className; }
+  if (text !== undefined) { node.textContent = text; }
+  return node;
+}
+
+for (const panel of PANELS) {
+  const box = el('div', 'panel');
+  const head = el('div', 'panel-head');
+  const title = el('span', 'panel-title', panel.title + ' ');
+  title.appendChild(el('span', 'unit', '(' + panel.unit + ')'));
+  head.appendChild(title);
+  const legend = el('span', 'legend');
+  panel.series.forEach((s, index) => {
+    const item = el('span', 'item');
+    s.colorVar = '--series-' + (index + 1);
+    const swatch = el('span', 'swatch');
+    swatch.style.background = 'var(' + s.colorVar + ')';
+    item.appendChild(swatch);
+    // One series needs no name beside it; the title says what it is.
+    if (panel.series.length > 1) { item.appendChild(el('span', '', s.label)); }
+    s.valueEl = el('span', 'num', '');
+    item.appendChild(s.valueEl);
+    legend.appendChild(item);
+  });
+  head.appendChild(legend);
+  box.appendChild(head);
+  panel.canvas = el('canvas');
+  box.appendChild(panel.canvas);
+  panelsEl.appendChild(box);
+}
+
+// The controller mode as a colored strip.
+const strip = { canvas: el('canvas') };
+{
+  const box = el('div', 'panel strip');
+  const head = el('div', 'panel-head');
+  head.appendChild(el('span', 'panel-title', 'Controller mode'));
+  const legend = el('span', 'legend');
+  for (const code of [3, 0, 1, 2, 4]) {
+    const item = el('span', 'item');
+    const block = el('span', 'block');
+    block.style.background = 'var(' + MODE_VARS[code] + ')';
+    item.appendChild(block);
+    item.appendChild(el('span', '', MODE_NAMES[code]));
+    legend.appendChild(item);
+  }
+  strip.valueEl = el('span', 'num', '');
+  legend.appendChild(strip.valueEl);
+  head.appendChild(legend);
+  box.appendChild(head);
+  box.appendChild(strip.canvas);
+  panelsEl.appendChild(box);
+}
+const axisCanvas = document.getElementById('axis');
+
+// ------------------------------------------------------------ readouts
+
+const READOUTS = [
+  ['rate', 'Sample rate'], ['rtt', 'Round trip'], ['missed', 'Missed replies'],
+  ['servo', 'Servo mode'], ['fault', 'Fault'], ['loop', 'Loop time, worst'],
+  ['late', 'Late cycles'], ['samples', 'Buffered'],
+];
+const readoutEls = {};
+for (const [key, name] of READOUTS) {
+  const box = el('div', 'readout');
+  box.appendChild(el('span', 'name', name));
+  readoutEls[key] = el('span', 'value', '–');
+  box.appendChild(readoutEls[key]);
+  document.getElementById('readouts').appendChild(box);
+}
+
+// ------------------------------------------------------------- drawing
+
+const GUTTER = 58;   // room for y axis labels, css pixels
+let windowSeconds = 10;
+let paused = false;
+let frozenEnd = 0;
+let hoverFraction = null;
+// The plot the pointer is over, and the time of the sample under it.
+let hoverCanvas = null;
+let hoverTime = null;
+
+function fitCanvas(canvas) {
+  const ratio = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.round(canvas.clientWidth * ratio));
+  const h = Math.max(1, Math.round(canvas.clientHeight * ratio));
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  return { ctx, w: canvas.clientWidth, h: canvas.clientHeight };
+}
+
+function niceStep(span, target) {
+  const raw = span / target;
+  const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  const frac = raw / pow;
+  return (frac < 1.5 ? 1 : frac < 3.5 ? 2 : frac < 7.5 ? 5 : 10) * pow;
+}
+
+function formatTick(value, step) {
+  const digits = Math.max(0, Math.min(6, -Math.floor(Math.log10(step) + 1e-9)));
+  return value.toFixed(digits);
+}
+
+function drawPanel(panel, i0, i1, t0, t1, colors) {
+  const { ctx, w, h } = fitCanvas(panel.canvas);
+  const plotW = w - GUTTER;
+  ctx.clearRect(0, 0, w, h);
+  if (plotW <= 4) { return; }
+  // The range comes from what is on screen.
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const s of panel.series) {
+    const data = store[s.key];
+    for (let i = i0; i < i1; i++) {
+      const y = data[i];
+      if (y < lo) { lo = y; }
+      if (y > hi) { hi = y; }
+    }
+  }
+  if (!(hi >= lo)) { lo = -1; hi = 1; }
+  if (hi - lo < 1e-6) { lo -= 0.5; hi += 0.5; }
+  const pad = (hi - lo) * 0.08;
+  lo -= pad;
+  hi += pad;
+
+  const yOf = (v) => h - 2 - (v - lo) / (hi - lo) * (h - 6);
+  const step = niceStep(hi - lo, 4);
+
+  ctx.font = '11px ' + colors.mono;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'right';
+  ctx.lineWidth = 1;
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+    const y = Math.round(yOf(v)) + 0.5;
+    ctx.strokeStyle = colors.grid;
+    ctx.beginPath();
+    ctx.moveTo(GUTTER, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+    ctx.fillStyle = colors.text3;
+    ctx.fillText(formatTick(Math.abs(v) < step * 1e-6 ? 0 : v, step),
+                 GUTTER - 6, Math.min(h - 7, Math.max(7, y)));
+  }
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(GUTTER, 0, plotW, h);
+  ctx.clip();
+  const scale = plotW / (t1 - t0);
+  for (const s of panel.series) {
+    const data = store[s.key];
+    ctx.strokeStyle = colors[s.colorVar];
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    // One vertical span per pixel column keeps the envelope of fast
+    // signals when there are many samples per pixel.
+    let column = -1;
+    let cmin = 0;
+    let cmax = 0;
+    let started = false;
+    const flush = () => {
+      if (column < 0) { return; }
+      const x = GUTTER + column + 0.5;
+      if (!started) { ctx.moveTo(x, yOf(cmin)); started = true; }
+      else { ctx.lineTo(x, yOf(cmin)); }
+      if (cmax !== cmin) { ctx.lineTo(x, yOf(cmax)); }
+    };
+    for (let i = i0; i < i1; i++) {
+      const y = data[i];
+      if (y !== y) {
+        // A gap: end the line here and start a new one afterwards.
+        flush();
+        column = -1;
+        started = false;
+        continue;
+      }
+      const px = Math.floor((store.t[i] - t0) * scale);
+      if (px !== column) {
+        flush();
+        column = px;
+        cmin = y;
+        cmax = y;
+      } else {
+        if (y < cmin) { cmin = y; }
+        if (y > cmax) { cmax = y; }
+      }
+    }
+    flush();
+    ctx.stroke();
+  }
+  ctx.restore();
+  drawCursor(ctx, w, h, colors);
+}
+
+function drawCursor(ctx, w, h, colors) {
+  if (hoverFraction === null) { return; }
+  const x = Math.round(GUTTER + hoverFraction * (w - GUTTER)) + 0.5;
+  ctx.strokeStyle = colors.text3;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x, 0);
+  ctx.lineTo(x, h);
+  ctx.stroke();
+
+  // On the plot the pointer is over, say what time that is.  The
+  // time axis shows it too, but may be off the screen.
+  if (ctx.canvas !== hoverCanvas || hoverTime === null) { return; }
+  const text = 't = ' + hoverTime.toFixed(3) + ' s';
+  ctx.font = '11px ' + colors.mono;
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+  const boxW = ctx.measureText(text).width + 10;
+  const boxX = x + 6 + boxW > w ? x - 6 - boxW : x + 6;
+  ctx.fillStyle = colors.text;
+  ctx.fillRect(boxX, 1, boxW, 16);
+  ctx.fillStyle = colors.bg;
+  ctx.fillText(text, boxX + 5, 4);
+}
+
+function drawStrip(i0, i1, t0, t1, colors) {
+  const { ctx, w, h } = fitCanvas(strip.canvas);
+  ctx.clearRect(0, 0, w, h);
+  const plotW = w - GUTTER;
+  if (plotW <= 4) { return; }
+  const scale = plotW / (t1 - t0);
+  const mode = store.balance_mode;
+  let start = i0;
+  for (let i = i0 + 1; i <= i1; i++) {
+    if (i === i1 || mode[i] !== mode[start]) {
+      const xa = GUTTER + (store.t[start] - t0) * scale;
+      const xb = GUTTER + ((i < i1 ? store.t[i] : store.t[i1 - 1]) - t0) * scale;
+      ctx.fillStyle = colors[MODE_VARS[mode[start]]] || colors.grid;
+      ctx.fillRect(Math.max(GUTTER, xa), 3, Math.max(1, xb - Math.max(GUTTER, xa)), h - 6);
+      start = i;
+    }
+  }
+  drawCursor(ctx, w, h, colors);
+}
+
+function drawAxis(t0, t1, colors, hoverTime) {
+  const { ctx, w, h } = fitCanvas(axisCanvas);
+  ctx.clearRect(0, 0, w, h);
+  // Line the labels up with the plots above, which sit inside a
+  // padded box.
+  const inset = 9;
+  const left = inset + GUTTER;
+  const plotW = w - 2 * inset - GUTTER;
+  if (plotW <= 4) { return; }
+  const span = t1 - t0;
+  const step = niceStep(span, Math.max(2, Math.floor(plotW / 90)));
+  ctx.font = '11px ' + colors.mono;
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = colors.text3;
+  for (let age = 0; age <= span + 1e-9; age += step) {
+    const x = left + plotW - age / span * plotW;
+    ctx.fillText(age === 0 ? 'now' : '−' + formatTick(age, step) + ' s', x, 4);
+  }
+
+  // Under the cursor: the time of that sample as it is in the saved
+  // file, and how long before the right hand edge it was.
+  if (hoverTime === null) { return; }
+  const text = 't = ' + hoverTime.toFixed(3) + ' s   (−' +
+      Math.max(0, t1 - hoverTime).toFixed(3) + ' s)';
+  const boxW = ctx.measureText(text).width + 12;
+  const x = left + (hoverTime - t0) / span * plotW;
+  const boxX = Math.max(0, Math.min(w - boxW, x - boxW / 2));
+  ctx.fillStyle = colors.text;
+  ctx.fillRect(boxX, 1, boxW, h - 2);
+  ctx.fillStyle = colors.bg;
+  ctx.textAlign = 'left';
+  ctx.fillText(text, boxX + 6, 4);
+}
+
+function readColors() {
+  const colors = {
+    grid: css('--grid'), text3: css('--text-3'), mono: css('--mono'),
+    text: css('--text'), bg: css('--bg'),
+  };
+  for (const name of ['--series-1', '--series-2', '--series-3',
+                      '--mode-waiting', '--mode-swingup', '--mode-balancing',
+                      '--mode-return', '--mode-settling']) {
+    colors[name] = css(name);
+  }
+  return colors;
+}
+let colors = readColors();
+matchMedia('(prefers-color-scheme: dark)').addEventListener(
+    'change', () => { colors = readColors(); });
+
+let lastText = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  syncStore();
+  const end = paused ? frozenEnd : (store.n ? store.t[store.n - 1] : 0);
+  const t1 = end;
+  const t0 = end - windowSeconds;
+  const i0 = lowerBound(t0);
+  const i1 = paused ? lowerBound(end + 1e-9) : store.n;
+
+  const hoverIndex = hoverSample(i0, i1, t0, t1);
+  hoverTime = hoverIndex === null ? null : store.t[hoverIndex];
+
+  for (const panel of PANELS) { drawPanel(panel, i0, i1, t0, t1, colors); }
+  drawStrip(i0, i1, t0, t1, colors);
+  drawAxis(t0, t1, colors, hoverTime);
+
+  // Numbers change slowly enough to read.
+  if (now - lastText > 100) {
+    lastText = now;
+    updateText(i0, i1, t0, t1);
+  }
+}
+
+// The sample under the cursor, or null.
+function hoverSample(i0, i1, t0, t1) {
+  if (hoverFraction === null || i1 <= i0) { return null; }
+  return Math.min(i1 - 1, Math.max(i0,
+      lowerBound(t0 + hoverFraction * (t1 - t0))));
+}
+
+function updateText(i0, i1, t0, t1) {
+  const hoverIndex = hoverSample(i0, i1, t0, t1);
+  const index = hoverIndex === null ? i1 - 1 : hoverIndex;
+  const has = index >= 0 && index < store.n && i1 > 0;
+  for (const panel of PANELS) {
+    for (const s of panel.series) {
+      s.valueEl.textContent = has ?
+          store[s.readKey || s.key][index].toFixed(s.digits) : '';
+    }
+  }
+  strip.valueEl.textContent = has ?
+      (MODE_NAMES[store.balance_mode[index]] || '?') : '';
+
+  const latest = store.n - 1;
+  if (latest >= 0) {
+    const mode = store.mode[latest];
+    const fault = store.fault[latest];
+    readoutEls.servo.textContent =
+        SPEC.enums.servo_mode[mode] || String(mode);
+    readoutEls.fault.textContent = fault === 0 ? 'none' :
+        fault + ' ' + (SPEC.enums.fault[fault] || '');
+    readoutEls.fault.classList.toggle('bad', fault !== 0 && fault < 96);
+    readoutEls.loop.textContent = (loopWorst * 100).toFixed(1) + ' %';
+    readoutEls.loop.classList.toggle('bad', loopWorst >= 1);
+    readoutEls.late.textContent = String(lateTotal);
+    readoutEls.late.classList.toggle('bad', lateTotal > 0);
+  }
+  readoutEls.samples.textContent = store.n.toLocaleString() +
+      (store.n > 1 ?
+       ' (' + (store.t[store.n - 1] - store.t[0]).toFixed(0) + ' s)' : '');
+  readoutEls.rate.textContent = stats.rate ? stats.rate.toFixed(0) + ' Hz' : '–';
+  readoutEls.rtt.textContent =
+      stats.rtt ? stats.rtt.toFixed(2) + ' ms' : '–';
+  readoutEls.missed.textContent = String(stats.missed);
+  readoutEls.missed.classList.toggle('bad', stats.missed > 0);
+}
+
+function onMove(event) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const fraction = (event.clientX - rect.left - GUTTER) / (rect.width - GUTTER);
+  hoverFraction = fraction >= 0 && fraction <= 1 ? fraction : null;
+  hoverCanvas = event.currentTarget;
+}
+for (const canvas of [...PANELS.map((p) => p.canvas), strip.canvas]) {
+  canvas.addEventListener('mousemove', onMove);
+  canvas.addEventListener('mouseleave', () => {
+    hoverFraction = null;
+    hoverCanvas = null;
+  });
+}
+
+// ---------------------------------------------------------- connection
+
+const stats = { rate: 0, rtt: 0, missed: 0, received: 0, lastCount: 0 };
+setInterval(() => {
+  stats.rate = (stats.received - stats.lastCount) * 2;
+  stats.lastCount = stats.received;
+}, 500);
+
+function onSample(values, hostMs) {
+  stats.received++;
+  addSample(values, hostMs);
+}
+
+const statusEl = document.getElementById('status');
+const statusText = document.getElementById('status-text');
+const messageEl = document.getElementById('message');
+const connectButton = document.getElementById('connect');
+const demoButton = document.getElementById('demo');
+const pauseButton = document.getElementById('pause');
+const saveButton = document.getElementById('save');
+
+function setStatus(kind, text) {
+  statusEl.className = kind;
+  statusText.textContent = text;
+}
+
+let link = null;       // the active serial session
+let demoTimer = null;
+let depth = 1;
+
+async function connectSerial() {
+  messageEl.textContent = '';
+  let port;
+  try {
+    port = await navigator.serial.requestPort({
+      filters: SPEC.adapter.usb_ids.map(
+          (id) => ({ usbVendorId: id.vendor, usbProductId: id.product })),
+    });
+  } catch (error) {
+    return;   // the chooser was dismissed
+  }
+  try {
+    await port.open({ baudRate: SPEC.adapter.baud_rate, bufferSize: 65536 });
+  } catch (error) {
+    messageEl.textContent = 'Could not open the adapter: ' + error.message +
+        ' Is another program using it?';
+    setStatus('error', 'Not connected');
+    return;
+  }
+  stopDemo();
+  resetTime();
+  const session = {
+    port,
+    reader: port.readable.getReader(),
+    writer: port.writable.getWriter(),
+    open: true,
+    sent: [],          // send times of queries still in flight
+    lastReply: performance.now(),
+    writing: false,
+  };
+  link = session;
+  connectButton.textContent = 'Disconnect';
+  pauseButton.disabled = false;
+  saveButton.disabled = false;
+  setStatus('live', 'Connected');
+  readLoop(session);
+  session.watchdog = setInterval(() => watchdog(session), 20);
+  pump(session);
+}
+
+const queryBytes = new TextEncoder().encode(codec.sendLine);
+
+// Keep `depth` queries in flight.
+async function pump(session) {
+  if (session.writing || !session.open) { return; }
+  session.writing = true;
+  try {
+    while (session.open && session.sent.length < depth) {
+      session.sent.push(performance.now());
+      await session.writer.write(queryBytes);
+    }
+  } catch (error) {
+    fail(session, error);
+  }
+  session.writing = false;
+}
+
+function watchdog(session) {
+  if (!session.open) { return; }
+  // A reply that has not come back in 50ms is not coming.
+  if (session.sent.length && performance.now() - session.lastReply > 50 &&
+      performance.now() - session.sent[0] > 50) {
+    stats.missed += session.sent.length;
+    session.sent.length = 0;
+    session.lastReply = performance.now();
+  }
+  pump(session);
+}
+
+async function readLoop(session) {
+  const decoder = new TextDecoder('latin1');
+  let pending = '';
+  try {
+    while (session.open) {
+      const { value, done } = await session.reader.read();
+      if (done) { break; }
+      const now = performance.now();
+      pending += decoder.decode(value, { stream: true });
+      let start = 0;
+      for (let i = 0; i < pending.length; i++) {
+        const c = pending.charCodeAt(i);
+        if (c !== 10 && c !== 13) { continue; }
+        if (i > start) { onLine(session, pending.slice(start, i), now); }
+        start = i + 1;
+      }
+      pending = pending.slice(start);
+      if (pending.length > 4096) { pending = ''; }
+      pump(session);
+    }
+  } catch (error) {
+    fail(session, error);
+  }
+}
+
+function onLine(session, line, now) {
+  if (line.startsWith('rcv')) {
+    const decoded = codec.decodeLine(line);
+    if (!decoded) { return; }
+    session.lastReply = now;
+    const sentAt = session.sent.shift();
+    if (sentAt !== undefined) {
+      const rtt = now - sentAt;
+      stats.rtt = stats.rtt ? stats.rtt * 0.98 + rtt * 0.02 : rtt;
+    }
+    if (decoded.errors.length) {
+      messageEl.textContent = 'The controller could not read register 0x' +
+          decoded.errors[0].register.toString(16) +
+          '. Is it running the firmware with the balance registers?';
+      return;
+    }
+    if (decoded.values.ms_counter === undefined) { return; }
+    onSample(decoded.values, now);
+  } else if (line.startsWith('ERR')) {
+    messageEl.textContent = 'Adapter reported: ' + line;
+  }
+}
+
+function fail(session, error) {
+  if (!session.open) { return; }
+  messageEl.textContent = 'Connection lost: ' + error.message;
+  disconnect(session, 'error');
+}
+
+async function disconnect(session, kind) {
+  if (!session || !session.open) { return; }
+  session.open = false;
+  clearInterval(session.watchdog);
+  if (link === session) { link = null; }
+  connectButton.textContent = 'Connect';
+  setStatus(kind || '', 'Not connected');
+  try { await session.reader.cancel(); } catch (error) { /* already gone */ }
+  try { session.reader.releaseLock(); } catch (error) { /* ignore */ }
+  try { session.writer.releaseLock(); } catch (error) { /* ignore */ }
+  try { await session.port.close(); } catch (error) { /* ignore */ }
+}
+
+// ---------------------------------------------------------------- demo
+
+// Made-up motion, sent through the same encoder and decoder as real
+// replies, so the page can be tried without the hardware.
+function startDemo() {
+  if (link) { disconnect(link); }
+  stopDemo();
+  clearData();
+  let t = 0;
+  let ms = 1000;
+  let noise = 0;
+  setStatus('live', 'Demo data (not from the controller)');
+  pauseButton.disabled = false;
+  saveButton.disabled = false;
+  const rand = () => Math.random() - 0.5;
+  demoTimer = setInterval(() => {
+    for (let k = 0; k < 20; k++) {
+      t += 0.001;
+      ms = (ms + 1) & 0xffff;
+      const phase = t % 24;
+      let balanceMode = 1;
+      let pole;
+      let motor;
+      let motorVel;
+      let torque;
+      let lean = 0;
+      if (phase < 1.5) {
+        balanceMode = 3;
+        pole = SPEC.defaults.angle_offset + 0.002 * Math.sin(17 * t);
+        motor = 0.2; motorVel = 0; torque = 0;
+      } else if (phase < 3) {
+        balanceMode = 0;
+        const a = (phase - 1.5) / 1.5;
+        pole = SPEC.defaults.angle_offset + 0.5 * a * Math.sin(16 * phase);
+        motor = 0.2 + 2.2 * a * Math.sin(8 * phase);
+        motorVel = 30 * a * Math.cos(8 * phase);
+        torque = 0.01 * Math.sign(Math.cos(16 * phase));
+      } else {
+        const slow = Math.sin(2 * Math.PI * 0.3 * t);
+        const step = Math.tanh(4 * slow);
+        motor = 0.35 * step;
+        motorVel = 0.35 * 4 * 2 * Math.PI * 0.3 *
+            Math.cos(2 * Math.PI * 0.3 * t) / Math.pow(Math.cosh(4 * slow), 2);
+        lean = 0.0012 * motor + 0.002 * motorVel;
+        noise = 0.9 * noise + 0.1 * rand();
+        pole = SPEC.defaults.angle_offset + 0.5 + lean * 0.8 +
+            0.0006 * Math.sin(2 * Math.PI * 9 * t) + 0.0008 * noise;
+        torque = 0.004 * Math.tanh(2 * motorVel) + 0.002 * rand();
+      }
+      const line = codec.encodeReply({
+        mode: balanceMode === 3 ? 0 : 16,
+        position: motor, velocity: motorVel + 0.05 * rand(),
+        torque: torque * 0.9 + 0.0015 * rand(),
+        q_current: torque / 0.015 + 0.03 * rand(),
+        fault: 0,
+        loop_time: 0.76 + 0.03 * Math.random(), late_cycles: 0,
+        balance_mode: balanceMode, balance_lean: lean,
+        balance_torque: torque, balance_integral: lean ? -0.0046 : 0,
+        pole_position: pole - Math.floor(pole),
+        pole_velocity: balanceMode === 1 ? 0.2 * rand() : 3 * Math.cos(16 * phase),
+        ms_counter: ms > 32767 ? ms - 65536 : ms,
+      });
+      const decoded = codec.decodeLine(line);
+      onSample(decoded.values, performance.now());
+    }
+  }, 20);
+}
+
+function stopDemo() {
+  if (demoTimer !== null) {
+    clearInterval(demoTimer);
+    demoTimer = null;
+  }
+}
+
+// ------------------------------------------------------------ controls
+
+connectButton.addEventListener('click', () => {
+  if (link) { disconnect(link); } else { connectSerial(); }
+});
+demoButton.addEventListener('click', startDemo);
+
+pauseButton.addEventListener('click', () => {
+  paused = !paused;
+  syncStore();
+  frozenEnd = store.n ? store.t[store.n - 1] : 0;
+  pauseButton.textContent = paused ? 'Resume' : 'Pause';
+});
+
+document.getElementById('window').addEventListener('change', (event) => {
+  windowSeconds = Number(event.target.value);
+});
+document.getElementById('depth').addEventListener('change', (event) => {
+  depth = Number(event.target.value);
+});
+
+const offsetInput = document.getElementById('offset');
+offsetInput.value = angleOffset;
+offsetInput.addEventListener('change', () => {
+  const value = Number(offsetInput.value);
+  if (Number.isFinite(value)) {
+    angleOffset = value;
+    recomputePole();
+  }
+});
+
+document.getElementById('clear').addEventListener('click', () => {
+  clearData();
+  stats.missed = 0;
+  if (paused) { pauseButton.click(); }
+});
+
+saveButton.addEventListener('click', () => {
+  syncStore();
+  const parts = ['time_s,host_ms,' + CHANNELS.join(',') + '\n'];
+  let chunk = '';
+  for (let i = 0; i < store.n; i++) {
+    let row = store.t[i].toFixed(4) + ',' + store.host[i].toFixed(2);
+    for (const name of CHANNELS) { row += ',' + store[name][i]; }
+    chunk += row + '\n';
+    if (chunk.length > 1 << 20) { parts.push(chunk); chunk = ''; }
+  }
+  parts.push(chunk);
+  const url = URL.createObjectURL(new Blob(parts, { type: 'text/csv' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'pendulum-' +
+      new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+if (!('serial' in navigator)) {
+  connectButton.disabled = true;
+  messageEl.textContent = 'This browser cannot talk to the adapter. ' +
+      'Open the page in Chrome or Edge on a computer.';
+}
+if (location.hash === '#demo') { startDemo(); }
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
