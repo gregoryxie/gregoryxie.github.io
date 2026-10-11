@@ -33,7 +33,7 @@ related_publications: false
         {% include figure.liquid path="assets/img/mdx_20_enamel_pins/PXL_20220115_213259810.jpeg" class="img-fluid rounded z-depth-1" %}
     </div>
     <div class="col-sm mt-3 mt-md-0">
-        {% include figure.liquid path="assets/img/mdx_20_enamel_pins/PXL_20220116_025209537-1.jpeg" class="img-fluid rounded z-depth-1" %}
+        {% include figure.liquid path="assets/img/mdx_20_enamel_pins/PXL_20220116_025209537.jpeg" class="img-fluid rounded z-depth-1" %}
     </div>
     <div class="col-sm mt-3 mt-md-0">
         {% include figure.liquid path="assets/img/mdx_20_enamel_pins/PXL_20220116_042348851.jpeg" class="img-fluid rounded z-depth-1" %}

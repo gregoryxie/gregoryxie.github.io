@@ -12,7 +12,7 @@ related_publications: false
         {% include figure.liquid path="assets/img/seesaw/Seesaw.png" class="img-fluid rounded z-depth-1" %}
     </div>
     <div class="col-sm mt-3 mt-md-0">
-        {% include figure.liquid path="assets/img/seesaw/Battery2.jpeg" class="img-fluid rounded z-depth-1" %}
+        {% include figure.liquid path="assets/img/seesaw/Battery2.png" class="img-fluid rounded z-depth-1" %}
     </div>
 </div>
 
